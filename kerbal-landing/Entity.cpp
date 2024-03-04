@@ -214,5 +214,5 @@ bool const Entity::check_collision(Entity* other) const
     float x_distance = fabs(m_position.x - other->m_position.x) - ((m_scale.x + other->m_scale.x) / 2.0f);
     float y_distance = fabs(m_position.y - other->m_position.y) - ((m_scale.y + other->m_scale.y) / 2.0f);
 
-    return x_distance < 0.0f && y_distance < 0.0f;
+    return round(x_distance * 1000) < 0.0f && round(y_distance * 1000) < 0.0f;
 }

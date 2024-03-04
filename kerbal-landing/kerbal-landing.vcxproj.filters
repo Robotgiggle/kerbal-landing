@@ -46,5 +46,14 @@
     <Image Include="assets\default_player.png">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="assets\background.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="assets\kerbal.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="assets\kerbal_head.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

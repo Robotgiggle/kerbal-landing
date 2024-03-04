@@ -21,6 +21,7 @@
 // ————— STRUCTS AND ENUMS —————//
 struct GameState
 {
+    Entity* background;
     Entity* player;
     Entity* platforms;
 };
@@ -28,8 +29,8 @@ struct GameState
 // ————— CONSTANTS ————— //
 
 // window size
-const int WINDOW_WIDTH = 640,
-          WINDOW_HEIGHT = 480;
+const int WINDOW_WIDTH = 800,
+          WINDOW_HEIGHT = 600;
 
 // background color
 const float BG_RED = 0.1922f,
@@ -48,7 +49,8 @@ const char V_SHADER_PATH[] = "shaders/vertex_textured.glsl",
            F_SHADER_PATH[] = "shaders/fragment_textured.glsl";
 
 // sprite filepaths
-const char SPRITESHEET_FILEPATH[] = "assets/kerbal.png",
+const char BACKGROUND_FILEPATH[] = "assets/background.png",
+           SPRITESHEET_FILEPATH[] = "assets/kerbal_head.png",
            PLATFORM_FILEPATH[] = "assets/default_platform.png";
 
 // world constants
@@ -68,6 +70,7 @@ const GLint TEXTURE_BORDER = 0;  // this value MUST be zero
 // custom
 const float THRUSTER_FORCE_X = 0.3f;
 const float THRUSTER_FORCE_Y = 0.5f;
+const float GROUND_OFFSET = 0.8f;
 
 // ————— VARIABLES ————— //
 
@@ -104,8 +107,8 @@ GLuint load_texture(const char* filepath)
     glBindTexture(GL_TEXTURE_2D, textureID);
     glTexImage2D(GL_TEXTURE_2D, LEVEL_OF_DETAIL, GL_RGBA, width, height, TEXTURE_BORDER, GL_RGBA, GL_UNSIGNED_BYTE, image);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -121,6 +124,39 @@ void add_acceleration(Entity* entity, glm::vec3 force) {
     acc.y += force.y;
     acc.z += force.z;
     entity->set_acceleration(acc);
+}
+
+float get_ground_level(float xPos) {
+    float output = -3.75f;
+    if (xPos < -4.143f) {
+        output = -0.1f * xPos - 3.0f;
+    } else if (xPos < -3.918f) {
+        output = -3.6f * xPos - 17.5f;
+    } else if (xPos < -3.533f) {
+        output = 2.5f * xPos + 6.4f;
+    } else if (xPos < -2.727f) {
+        output = -0.5f * xPos - 4.2f;
+    } else if (xPos < -1.926f) {
+        output = 1.7f * xPos + 1.8f;
+    } else if (xPos < -0.643f) {
+        output = -1.0f * xPos - 3.4f;
+    } else if (xPos < 0.125f) {
+        output = 0.4f * xPos - 2.5f;
+    } else if (xPos < 1.5f) {
+        output = -0.4f * xPos - 2.4f;
+    } else if (xPos < 2.813f) {
+        output = 0.2f * xPos - 3.3f;
+    } else if (xPos < 3.741f) {
+        output = 1.8f * xPos - 7.8f;
+    } else if (xPos < 4.143f) {
+        output = -3.6f * xPos + 12.4f;
+    } else if (xPos < 5.0f) {
+        output = -0.1f * xPos - 2.1f;
+    } else {
+        LOG("Invalid X position!");
+        assert(false);
+    }
+    return output;
 }
 
 void initialise()
@@ -152,10 +188,18 @@ void initialise()
 
     glClearColor(BG_RED, BG_BLUE, BG_GREEN, BG_OPACITY);
 
+    // ————— BACKGROUND ————— //
+    g_gameState.background = new Entity();
+    g_gameState.background->m_texture_id = load_texture(BACKGROUND_FILEPATH);
+    g_gameState.background->set_position(glm::vec3(0.0f));
+    g_gameState.background->set_width(10.0f);
+    g_gameState.background->set_height(7.5f);
+    g_gameState.background->update(0.0f, NULL, 0);
+
     // ————— PLAYER ————— //
     // setup basic attributes
     g_gameState.player = new Entity();
-    g_gameState.player->set_position(glm::vec3(-4.5f, 3.0f, 0.0f));
+    g_gameState.player->set_position(glm::vec3(-4.6f, 3.4f, 0.0f));
     g_gameState.player->set_acceleration(glm::vec3(0.0f, ACC_OF_GRAVITY*GRAVITY_FACTOR, 0.0f));
     g_gameState.player->m_texture_id = load_texture(SPRITESHEET_FILEPATH);
     g_gameState.player->m_jumping_power = 3.0f;
@@ -172,8 +216,8 @@ void initialise()
     g_gameState.player->m_animation_time = 0.0f;
     g_gameState.player->m_animation_cols = 4;
     g_gameState.player->m_animation_rows = 2;
-    g_gameState.player->set_height(0.75f);
-    g_gameState.player->set_width(0.5f);
+    g_gameState.player->set_height(0.35f);
+    g_gameState.player->set_width(0.4f);
 
     // ————— PLATFORM ————— //
     g_gameState.platforms = new Entity[PLATFORM_COUNT];
@@ -221,6 +265,8 @@ void process_input()
 
     const Uint8* key_state = SDL_GetKeyboardState(NULL);
 
+    // TODO: change this to use actual Lunar Lander controls
+    // ie L/R rotates the lander, U fires the thruster
 
     if (key_state[SDL_SCANCODE_LEFT])
     {
@@ -256,7 +302,30 @@ void update()
     if (g_timeAccumulator < FIXED_TIMESTEP) return;
     while (g_timeAccumulator >= FIXED_TIMESTEP)
     {
+        glm::vec3 pos = g_gameState.player->get_position();
+        glm::vec3 vel = g_gameState.player->get_velocity();
+
+        // check for wall collision
+        if (abs(pos.x) >= 5.0f - g_gameState.player->get_width() / 2) {
+            vel.x = 0.0f;
+            pos.x += (pos.x > 0)? -0.01f : 0.01f;
+        }
+        if (pos.y >= 3.75f - g_gameState.player->get_height() / 2) {
+            vel.y = 0.0f;
+            pos.y -= 0.01f;
+        }
+            
+        // check for ground collision
+        if (pos.y <= get_ground_level(pos.x) + GROUND_OFFSET + g_gameState.player->get_height() / 2) {
+            // this should trigger a game-over
+            vel.y = 0.0f;
+        }
+
+        // move the player
+        g_gameState.player->set_position(pos);
+        g_gameState.player->set_velocity(vel);
         g_gameState.player->update(FIXED_TIMESTEP, g_gameState.platforms, 3);
+
         g_timeAccumulator -= FIXED_TIMESTEP;
     }
 }
@@ -265,6 +334,9 @@ void render()
 {
     // ————— GENERAL ————— //
     glClear(GL_COLOR_BUFFER_BIT);
+
+    // ————— BACKGROUND ————— //
+    g_gameState.background->render(&g_shaderProgram);
 
     // ————— PLAYER ————— //
     g_gameState.player->render(&g_shaderProgram);
