@@ -22,6 +22,7 @@ Entity::Entity()
 
     // ––––– TRANSFORMATION ––––– //
     m_speed = 0;
+    m_rotation = 0;
     m_movement = glm::vec3(0.0f);
     m_scale = glm::vec3(1.0f);
     m_model_matrix = glm::mat4(1.0f);
@@ -29,6 +30,9 @@ Entity::Entity()
 
 Entity::~Entity()
 {
+    for (int i = 0; i < 4; i++) {
+        delete[] m_walking[i];
+    }
     delete[] m_walking;
 }
 
@@ -100,8 +104,24 @@ void Entity::update(float delta_time, Entity* collidable_entities, int collidabl
         }
     }
 
-    // ––––– GRAVITY ––––– //
-    m_velocity += m_acceleration * delta_time;
+    // ––––– MOTION ––––– //
+    switch (m_control_mode) {
+    case 0:
+        // controlled on both X and Y axes
+        m_velocity = m_movement * m_speed;
+        break;
+    case 1:
+        // controlled on X axis, physics on Y axis
+        m_velocity.x = m_movement.x * m_speed;
+        m_velocity += m_acceleration * delta_time;
+        break;
+    case 2:
+        // physics only
+        m_velocity += m_acceleration * delta_time;
+        break;
+    default:
+        break;
+    }
 
     m_position.y += m_velocity.y * delta_time;
     check_collision_y(collidable_entities, collidable_entity_count);
@@ -122,6 +142,7 @@ void Entity::update(float delta_time, Entity* collidable_entities, int collidabl
     // ––––– TRANSFORMATIONS ––––– //
     m_model_matrix = glm::mat4(1.0f);
     m_model_matrix = glm::translate(m_model_matrix, m_position);
+    m_model_matrix = glm::rotate(m_model_matrix, glm::radians(m_rotation), glm::vec3(0.0f, 0.0f, 1.0f));
     m_model_matrix = glm::scale(m_model_matrix, m_scale);
 }
 
@@ -214,5 +235,5 @@ bool const Entity::check_collision(Entity* other) const
     float x_distance = fabs(m_position.x - other->m_position.x) - ((m_scale.x + other->m_scale.x) / 2.0f);
     float y_distance = fabs(m_position.y - other->m_position.y) - ((m_scale.y + other->m_scale.y) / 2.0f);
 
-    return round(x_distance * 1000) < 0.0f && round(y_distance * 1000) < 0.0f;
+    return x_distance < 0.0f && y_distance < 0.0f;
 }

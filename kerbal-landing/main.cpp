@@ -127,32 +127,22 @@ void add_acceleration(Entity* entity, glm::vec3 force) {
 }
 
 float get_ground_level(float xPos) {
+    // determines where the ground is based on a really big piecewise function
+    // the function is available here: https://www.desmos.com/calculator/gs3nqgoldy
     float output = -3.75f;
-    if (xPos < -4.143f) {
-        output = -0.1f * xPos - 3.0f;
-    } else if (xPos < -3.918f) {
-        output = -3.6f * xPos - 17.5f;
-    } else if (xPos < -3.533f) {
-        output = 2.5f * xPos + 6.4f;
-    } else if (xPos < -2.727f) {
-        output = -0.5f * xPos - 4.2f;
-    } else if (xPos < -1.926f) {
-        output = 1.7f * xPos + 1.8f;
-    } else if (xPos < -0.643f) {
-        output = -1.0f * xPos - 3.4f;
-    } else if (xPos < 0.125f) {
-        output = 0.4f * xPos - 2.5f;
-    } else if (xPos < 1.5f) {
-        output = -0.4f * xPos - 2.4f;
-    } else if (xPos < 2.813f) {
-        output = 0.2f * xPos - 3.3f;
-    } else if (xPos < 3.741f) {
-        output = 1.8f * xPos - 7.8f;
-    } else if (xPos < 4.143f) {
-        output = -3.6f * xPos + 12.4f;
-    } else if (xPos < 5.0f) {
-        output = -0.1f * xPos - 2.1f;
-    } else {
+    if (-5.0f < xPos and xPos < -4.143f) output = -0.1f * xPos - 3.0f;
+    else if (xPos < -3.918f) output = -3.6f * xPos - 17.5f;
+    else if (xPos < -3.533f) output = 2.5f * xPos + 6.4f;
+    else if (xPos < -2.727f) output = -0.5f * xPos - 4.2f;
+    else if (xPos < -1.926f) output = 1.7f * xPos + 1.8f;
+    else if (xPos < -0.643f) output = -1.0f * xPos - 3.4f;
+    else if (xPos < 0.125f) output = 0.4f * xPos - 2.5f;
+    else if (xPos < 1.5f) output = -0.4f * xPos - 2.4f;
+    else if (xPos < 2.813f) output = 0.2f * xPos - 3.3f;
+    else if (xPos < 3.741f) output = 1.8f * xPos - 7.8f;
+    else if (xPos < 4.143f) output = -3.6f * xPos + 12.4f;
+    else if (xPos < 5.0f) output = -0.1f * xPos - 2.1f;
+    else {
         LOG("Invalid X position!");
         assert(false);
     }
@@ -203,6 +193,7 @@ void initialise()
     g_gameState.player->set_acceleration(glm::vec3(0.0f, ACC_OF_GRAVITY*GRAVITY_FACTOR, 0.0f));
     g_gameState.player->m_texture_id = load_texture(SPRITESHEET_FILEPATH);
     g_gameState.player->m_jumping_power = 3.0f;
+    g_gameState.player->m_control_mode = 2;
 
     // setup thruster animation
     //g_gameState.player->m_walking[g_gameState.player->DOWN]  = new int[4] { 0 };
@@ -302,30 +293,42 @@ void update()
     if (g_timeAccumulator < FIXED_TIMESTEP) return;
     while (g_timeAccumulator >= FIXED_TIMESTEP)
     {
+        // get player info
         glm::vec3 pos = g_gameState.player->get_position();
         glm::vec3 vel = g_gameState.player->get_velocity();
+        float xOffset = g_gameState.player->get_width() / 2;
+        float yOffset = g_gameState.player->get_height() / 2;
 
         // check for wall collision
-        if (abs(pos.x) >= 5.0f - g_gameState.player->get_width() / 2) {
+        if (abs(pos.x) >= 5.0f - xOffset) {
             vel.x = 0.0f;
             pos.x += (pos.x > 0)? -0.01f : 0.01f;
         }
-        if (pos.y >= 3.75f - g_gameState.player->get_height() / 2) {
+        if (pos.y >= 3.75f - yOffset) {
             vel.y = 0.0f;
             pos.y -= 0.01f;
         }
             
         // check for ground collision
-        if (pos.y <= get_ground_level(pos.x) + GROUND_OFFSET + g_gameState.player->get_height() / 2) {
-            // this should trigger a game-over
-            vel.y = 0.0f;
+        glm::vec3* collisionPoints = new glm::vec3[3]{
+            pos + glm::vec3(0.0f,0.0f-yOffset,0.0f),
+            pos + glm::vec3(-0.19f,0.1f-yOffset,0.0f),
+            pos + glm::vec3(0.19f,0.1f-yOffset,0.0f),
+        };
+        for (int i = 0; i < 3; i++) {
+            if (collisionPoints[i].y <= get_ground_level(collisionPoints[i].x) + GROUND_OFFSET) {
+                // this should trigger a game-over
+                vel.y = 0.0f;
+            }
         }
+        delete[] collisionPoints;
 
         // move the player
         g_gameState.player->set_position(pos);
         g_gameState.player->set_velocity(vel);
         g_gameState.player->update(FIXED_TIMESTEP, g_gameState.platforms, 3);
 
+        // update time accumulator
         g_timeAccumulator -= FIXED_TIMESTEP;
     }
 }
@@ -348,7 +351,12 @@ void render()
     SDL_GL_SwapWindow(g_displayWindow);
 }
 
-void shutdown() { SDL_Quit(); }
+void shutdown() { 
+    SDL_Quit();
+    delete[] g_gameState.background;
+    delete[] g_gameState.player;
+    delete[] g_gameState.platforms;
+}
 
 // ————— DRIVER GAME LOOP ————— /
 int main(int argc, char* argv[])
