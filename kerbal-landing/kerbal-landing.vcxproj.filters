@@ -40,19 +40,31 @@
     <Image Include="assets\default_font.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="assets\default_platform.png">
-      <Filter>Resource Files</Filter>
-    </Image>
     <Image Include="assets\default_player.png">
       <Filter>Resource Files</Filter>
     </Image>
     <Image Include="assets\background.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="assets\kerbal.png">
+    <Image Include="assets\kerbal_head.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="assets\kerbal_head.png">
+    <Image Include="assets\debug_background.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="assets\flame.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="assets\landing_pad.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="assets\terrain.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="assets\you_lose.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="assets\you_win.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

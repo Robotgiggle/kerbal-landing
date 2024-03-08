@@ -144,11 +144,15 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="assets\background.png" />
+    <Image Include="assets\debug_background.png" />
     <Image Include="assets\default_font.png" />
-    <Image Include="assets\default_platform.png" />
     <Image Include="assets\default_player.png" />
-    <Image Include="assets\kerbal.png" />
+    <Image Include="assets\flame.png" />
     <Image Include="assets\kerbal_head.png" />
+    <Image Include="assets\landing_pad.png" />
+    <Image Include="assets\terrain.png" />
+    <Image Include="assets\you_lose.png" />
+    <Image Include="assets\you_win.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

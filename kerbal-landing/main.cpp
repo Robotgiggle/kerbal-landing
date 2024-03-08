@@ -22,8 +22,11 @@
 struct GameState
 {
     Entity* background;
+    Entity* terrain;
     Entity* player;
+    Entity* flame;
     Entity* landingPads;
+    Entity* endText;
 };
 
 // ————— CONSTANTS ————— //
@@ -50,8 +53,12 @@ const char V_SHADER_PATH[] = "shaders/vertex_textured.glsl",
 
 // sprite filepaths
 const char BACKGROUND_FILEPATH[] = "assets/background.png",
+           TERRAIN_FILEPATH[] = "assets/terrain.png",
            SPRITESHEET_FILEPATH[] = "assets/kerbal_head.png",
-           LANDINGPAD_FILEPATH[] = "assets/landing_pad.png";
+           FLAME_FILEPATH[] = "assets/flame.png",
+           LANDINGPAD_FILEPATH[] = "assets/landing_pad.png",
+           VICTORY_FILEPATH[] = "assets/you_win.png",
+           CRASHED_FILEPATH[] = "assets/you_lose.png";
 
 // world constants
 const float MILLISECONDS_IN_SECOND = 1000.0;
@@ -71,7 +78,7 @@ const int LANDINGPAD_COUNT = 4;
 const glm::vec3 PAD_COORDINATES[] = {
     glm::vec3(-3.9f,-2.4f,0.0f),
     glm::vec3(1.55f,-2.35f,0.0f),
-    glm::vec3(-1.9f,-1.0f,0.0f),
+    glm::vec3(-1.9f,-0.95f,0.0f),
     glm::vec3(4.05f,-1.2f,0.0f),
 };
 
@@ -92,6 +99,9 @@ float g_timeAccumulator = 0.0f;
 
 // custom
 bool g_tooFast = false;
+bool g_thrusterOn = false;
+bool g_showEndText = false;
+float g_endingTimer = 4.0f;
 
 // ———— GENERAL FUNCTIONS ———— //
 GLuint load_texture(const char* filepath)
@@ -152,6 +162,16 @@ float get_ground_level(float xPos) {
     return output;
 }
 
+void end_game(bool success) {
+    g_gameState.endText = new Entity();
+    if (success) g_gameState.endText->m_texture_id = load_texture(VICTORY_FILEPATH);
+    else g_gameState.endText->m_texture_id = load_texture(CRASHED_FILEPATH);
+    g_gameState.endText->set_width(10.0f);
+    g_gameState.endText->set_height(7.5f);
+    g_gameState.endText->update(0.0f, NULL, 0);
+    g_showEndText = true;
+}
+
 void initialise()
 {
     SDL_Init(SDL_INIT_VIDEO);
@@ -184,10 +204,16 @@ void initialise()
     // ————— BACKGROUND ————— //
     g_gameState.background = new Entity();
     g_gameState.background->m_texture_id = load_texture(BACKGROUND_FILEPATH);
-    g_gameState.background->set_position(glm::vec3(0.0f));
     g_gameState.background->set_width(10.0f);
     g_gameState.background->set_height(7.5f);
     g_gameState.background->update(0.0f, NULL, 0);
+
+    // ————— TERRAIN ————— //
+    g_gameState.terrain = new Entity();
+    g_gameState.terrain->m_texture_id = load_texture(TERRAIN_FILEPATH);
+    g_gameState.terrain->set_width(10.0f);
+    g_gameState.terrain->set_height(7.5f);
+    g_gameState.terrain->update(0.0f, NULL, 0);
 
     // ————— PLAYER ————— //
     // setup basic attributes
@@ -204,6 +230,12 @@ void initialise()
     // setup visuals
     g_gameState.player->set_height(0.35f);
     g_gameState.player->set_width(0.4f);
+
+    // ————— FLAME ————— //
+    g_gameState.flame = new Entity();
+    g_gameState.flame->m_texture_id = load_texture(FLAME_FILEPATH);
+    g_gameState.flame->set_width(0.25f);
+    g_gameState.flame->set_height(0.6f);
 
     // ————— LANDING PADS ————— //
     g_gameState.landingPads = new Entity[LANDINGPAD_COUNT];
@@ -269,11 +301,14 @@ void process_input()
         //add_acceleration(g_gameState.player, glm::vec3(THRUSTER_FORCE_X, 0.0f, 0.0f));
     }
     if (key_state[SDL_SCANCODE_UP]) {
+        g_thrusterOn = true;
         glm::vec3 thrustVec = glm::vec3(
             THRUSTER_FORCE * cos(glm::radians(angle+90)),
             THRUSTER_FORCE * sin(glm::radians(angle+90)),
             0.0f);
         add_acceleration(g_gameState.player, thrustVec);
+    } else {
+        g_thrusterOn = false;
     }
 
     // normalize forced-movement vector so you don't go faster diagonally
@@ -295,6 +330,13 @@ void update()
     if (g_timeAccumulator < FIXED_TIMESTEP) return;
     while (g_timeAccumulator >= FIXED_TIMESTEP)
     {
+        // handle game ending
+        if (g_showEndText) {
+            if ((g_endingTimer -= FIXED_TIMESTEP) <= 0) {
+                g_gameIsRunning = false;
+            }
+        }
+        
         // get player info
         glm::vec3 pos = g_gameState.player->get_position();
         glm::vec3 vel = g_gameState.player->get_velocity();
@@ -320,28 +362,39 @@ void update()
         };
         for (int i = 0; i < 3; i++) {
             if (collisionPoints[i].y <= get_ground_level(collisionPoints[i].x) + GROUND_OFFSET) {
-                g_gameIsRunning = false;
+                vel = glm::vec3(0.0f);
+                end_game(false);
             }
         }
         delete[] collisionPoints;
 
         // check for successful landing
         if (g_gameState.player->m_collided_bottom) {
+            vel = glm::vec3(0.0f);
             if (angle > 25 or angle < -25 or g_tooFast) {
-                g_gameIsRunning = false;
+                end_game(false);
             } else {
-                // you win!
+                end_game(true);
             }
         }
 
-        // check player speed
+        // check if player is moving slow enough to land
         float currentSpeed = glm::length(vel);
         g_tooFast = currentSpeed >= SAFE_SPEED;
 
         // move the player
         g_gameState.player->set_position(pos);
         g_gameState.player->set_velocity(vel);
-        g_gameState.player->update(FIXED_TIMESTEP, g_gameState.landingPads, 3);
+        g_gameState.player->update(FIXED_TIMESTEP, g_gameState.landingPads, LANDINGPAD_COUNT);
+
+        // reposition the flame
+        glm::vec3 flameOffset = glm::vec3(
+            0.4f * cos(glm::radians(angle - 90)),
+            0.4f * sin(glm::radians(angle - 90)),
+            0.0f);
+        g_gameState.flame->set_position(g_gameState.player->get_position() + flameOffset);
+        g_gameState.flame->set_angle(angle);
+        g_gameState.flame->update(FIXED_TIMESTEP, NULL, 0);
 
         // update time accumulator
         g_timeAccumulator -= FIXED_TIMESTEP;
@@ -356,11 +409,20 @@ void render()
     // ————— BACKGROUND ————— //
     g_gameState.background->render(&g_shaderProgram);
 
+    // ————— FLAME ————— //
+    if (g_thrusterOn) g_gameState.flame->render(&g_shaderProgram);
+
     // ————— PLAYER ————— //
     g_gameState.player->render(&g_shaderProgram);
 
-    // ————— LANDINGPAD ————— //
+    // ————— LANDING PADS ————— //
     for (int i = 0; i < LANDINGPAD_COUNT; i++) g_gameState.landingPads[i].render(&g_shaderProgram);
+
+    // ————— TERRAIN ————— //
+    g_gameState.terrain->render(&g_shaderProgram);
+
+    // ————— ENDING TEXT ————— //
+    if (g_showEndText) g_gameState.endText->render(&g_shaderProgram);
 
     // ————— GENERAL ————— //
     SDL_GL_SwapWindow(g_displayWindow);
@@ -369,8 +431,11 @@ void render()
 void shutdown() { 
     SDL_Quit();
     delete[] g_gameState.background;
+    delete[] g_gameState.terrain;
     delete[] g_gameState.player;
+    delete[] g_gameState.flame;
     delete[] g_gameState.landingPads;
+    delete[] g_gameState.endText;
 }
 
 // ————— DRIVER GAME LOOP ————— /
