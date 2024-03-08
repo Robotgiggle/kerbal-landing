@@ -4,12 +4,14 @@ private:
     bool m_is_active = true;
 
     // ––––– PHYSICS (GRAVITY) ––––– //
+    float     m_angle;
     glm::vec3 m_position;
     glm::vec3 m_velocity;
     glm::vec3 m_acceleration;
 
     // ————— TRANSFORMATIONS ————— //
     float     m_speed;
+    float     m_rot_speed;
     float     m_rotation;
     glm::vec3 m_movement;
     glm::vec3 m_scale;
@@ -64,6 +66,9 @@ public:
     void move_up() { m_movement.y = 1.0f; };
     void move_down() { m_movement.y = -1.0f; };
 
+    void rotate_clockwise() { m_rotation = -1.0f; };
+    void rotate_anticlockwise() { m_rotation = 1.0f; };
+
     void activate() { m_is_active = true; };
     void deactivate() { m_is_active = false; };
 
@@ -73,6 +78,8 @@ public:
     glm::vec3 const get_acceleration() const { return m_acceleration; };
     glm::vec3 const get_movement()     const { return m_movement; };
     float     const get_rotation()     const { return m_rotation; };
+    float     const get_angle()        const { return m_angle; };
+    float     const get_rot_speed()    const { return m_rot_speed; };
     float     const get_speed()        const { return m_speed; };
     float     const get_width()        const { return m_scale.x; };
     float     const get_height()       const { return m_scale.y; };
@@ -83,6 +90,8 @@ public:
     void const set_acceleration(glm::vec3 new_position) { m_acceleration = new_position; };
     void const set_movement(glm::vec3 new_movement) { m_movement = new_movement; };
     void const set_rotation(float new_rotation) { m_rotation = new_rotation; };
+    void const set_angle(float new_angle) { m_angle = new_angle; };
+    void const set_rot_speed(float new_rot_speed) { m_rot_speed = new_rot_speed; };
     void const set_speed(float new_speed) { m_speed = new_speed; };
     void const set_width(float new_width) { m_scale.x = new_width; };
     void const set_height(float new_height) { m_scale.y = new_height; };

@@ -22,7 +22,7 @@ Entity::Entity()
 
     // ––––– TRANSFORMATION ––––– //
     m_speed = 0;
-    m_rotation = 0;
+    m_angle = 0;
     m_movement = glm::vec3(0.0f);
     m_scale = glm::vec3(1.0f);
     m_model_matrix = glm::mat4(1.0f);
@@ -129,6 +129,9 @@ void Entity::update(float delta_time, Entity* collidable_entities, int collidabl
     m_position.x += m_velocity.x * delta_time;
     check_collision_x(collidable_entities, collidable_entity_count);
 
+    // ––––– ROTATION ––––– //
+    m_angle += m_rotation * m_rot_speed * 45.0f * delta_time;
+
     // ––––– JUMPING ––––– //
     if (m_is_jumping)
     {
@@ -142,7 +145,7 @@ void Entity::update(float delta_time, Entity* collidable_entities, int collidabl
     // ––––– TRANSFORMATIONS ––––– //
     m_model_matrix = glm::mat4(1.0f);
     m_model_matrix = glm::translate(m_model_matrix, m_position);
-    m_model_matrix = glm::rotate(m_model_matrix, glm::radians(m_rotation), glm::vec3(0.0f, 0.0f, 1.0f));
+    m_model_matrix = glm::rotate(m_model_matrix, glm::radians(m_angle), glm::vec3(0.0f, 0.0f, 1.0f));
     m_model_matrix = glm::scale(m_model_matrix, m_scale);
 }
 

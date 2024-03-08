@@ -23,7 +23,7 @@ struct GameState
 {
     Entity* background;
     Entity* player;
-    Entity* platforms;
+    Entity* landingPads;
 };
 
 // ————— CONSTANTS ————— //
@@ -51,16 +51,12 @@ const char V_SHADER_PATH[] = "shaders/vertex_textured.glsl",
 // sprite filepaths
 const char BACKGROUND_FILEPATH[] = "assets/background.png",
            SPRITESHEET_FILEPATH[] = "assets/kerbal_head.png",
-           PLATFORM_FILEPATH[] = "assets/default_platform.png";
+           LANDINGPAD_FILEPATH[] = "assets/landing_pad.png";
 
 // world constants
 const float MILLISECONDS_IN_SECOND = 1000.0;
 const float FIXED_TIMESTEP = 0.0166666f;
-const float ACC_OF_GRAVITY = -9.81f;
-const float GRAVITY_FACTOR = 0.01f;
-
-// entity counts
-const int PLATFORM_COUNT = 3;
+const float ACC_OF_GRAVITY = -0.08f;
 
 // texture generation stuff
 const int NUMBER_OF_TEXTURES = 1;  // to be generated, that is
@@ -68,9 +64,16 @@ const GLint LEVEL_OF_DETAIL = 0;  // base image level; Level n is the nth mipmap
 const GLint TEXTURE_BORDER = 0;  // this value MUST be zero
 
 // custom
-const float THRUSTER_FORCE_X = 0.3f;
-const float THRUSTER_FORCE_Y = 0.5f;
+const float THRUSTER_FORCE = 0.3f;
 const float GROUND_OFFSET = 0.8f;
+const float SAFE_SPEED = 0.35f;
+const int LANDINGPAD_COUNT = 4;
+const glm::vec3 PAD_COORDINATES[] = {
+    glm::vec3(-3.9f,-2.4f,0.0f),
+    glm::vec3(1.55f,-2.35f,0.0f),
+    glm::vec3(-1.9f,-1.0f,0.0f),
+    glm::vec3(4.05f,-1.2f,0.0f),
+};
 
 // ————— VARIABLES ————— //
 
@@ -88,7 +91,7 @@ float g_previousTicks = 0.0f;
 float g_timeAccumulator = 0.0f;
 
 // custom
-
+bool g_tooFast = false;
 
 // ———— GENERAL FUNCTIONS ———— //
 GLuint load_texture(const char* filepath)
@@ -189,35 +192,29 @@ void initialise()
     // ————— PLAYER ————— //
     // setup basic attributes
     g_gameState.player = new Entity();
+    g_gameState.player->set_angle(-90.0f);
     g_gameState.player->set_position(glm::vec3(-4.6f, 3.4f, 0.0f));
-    g_gameState.player->set_acceleration(glm::vec3(0.0f, ACC_OF_GRAVITY*GRAVITY_FACTOR, 0.0f));
+    g_gameState.player->set_velocity(glm::vec3(0.4f, 0.0f, 0.0f));
+    g_gameState.player->set_acceleration(glm::vec3(0.0f, ACC_OF_GRAVITY, 0.0f));
     g_gameState.player->m_texture_id = load_texture(SPRITESHEET_FILEPATH);
+    g_gameState.player->set_rot_speed(1.0f);
     g_gameState.player->m_jumping_power = 3.0f;
     g_gameState.player->m_control_mode = 2;
 
-    // setup thruster animation
-    //g_gameState.player->m_walking[g_gameState.player->DOWN]  = new int[4] { 0 };
-    //g_gameState.player->m_walking[g_gameState.player->LEFT]  = new int[4] { 1, 5 };
-    //g_gameState.player->m_walking[g_gameState.player->UP]    = new int[4] { 2, 6 };
-    //g_gameState.player->m_walking[g_gameState.player->RIGHT] = new int[4] { 3, 7 };
-
-    //g_gameState.player->m_animation_indices = g_gameState.player->m_walking[g_gameState.player->DOWN];
-    g_gameState.player->m_animation_frames = 2;
-    g_gameState.player->m_animation_index = 0;
-    g_gameState.player->m_animation_time = 0.0f;
-    g_gameState.player->m_animation_cols = 4;
-    g_gameState.player->m_animation_rows = 2;
+    // setup visuals
     g_gameState.player->set_height(0.35f);
     g_gameState.player->set_width(0.4f);
 
-    // ————— PLATFORM ————— //
-    g_gameState.platforms = new Entity[PLATFORM_COUNT];
+    // ————— LANDING PADS ————— //
+    g_gameState.landingPads = new Entity[LANDINGPAD_COUNT];
 
-    for (int i = 0; i < PLATFORM_COUNT; i++)
+    for (int i = 0; i < LANDINGPAD_COUNT; i++)
     {
-        g_gameState.platforms[i].m_texture_id = load_texture(PLATFORM_FILEPATH);
-        g_gameState.platforms[i].set_position(glm::vec3(i - 1.0f, -3.0f, 0.0f));
-        g_gameState.platforms[i].update(0.0f, NULL, 0);
+        g_gameState.landingPads[i].m_texture_id = load_texture(LANDINGPAD_FILEPATH);
+        g_gameState.landingPads[i].set_position(PAD_COORDINATES[i]);
+        g_gameState.landingPads[i].set_width(0.35f);
+        g_gameState.landingPads[i].set_height(0.7f);
+        g_gameState.landingPads[i].update(0.0f, NULL, 0);
     }
 
     // ————— GENERAL ————— //
@@ -228,7 +225,8 @@ void initialise()
 void process_input()
 {
     // reset forced-movement if no player input
-    g_gameState.player->set_acceleration(glm::vec3(0.0f, ACC_OF_GRAVITY * GRAVITY_FACTOR, 0.0f));
+    g_gameState.player->set_acceleration(glm::vec3(0.0f, ACC_OF_GRAVITY, 0.0f));
+    g_gameState.player->set_rotation(0.0f);
 
     SDL_Event event;
     while (SDL_PollEvent(&event))
@@ -254,24 +252,28 @@ void process_input()
         }
     }
 
+    float angle = g_gameState.player->get_angle();
     const Uint8* key_state = SDL_GetKeyboardState(NULL);
-
-    // TODO: change this to use actual Lunar Lander controls
-    // ie L/R rotates the lander, U fires the thruster
-
     if (key_state[SDL_SCANCODE_LEFT])
     {
-        add_acceleration(g_gameState.player, glm::vec3(-1*THRUSTER_FORCE_X, 0.0f, 0.0f));
-        //g_gameState.player->m_animation_indices = g_gameState.player->m_walking[g_gameState.player->LEFT];
+        if (angle < 90.0f) {
+            g_gameState.player->rotate_anticlockwise();
+        }
+        //add_acceleration(g_gameState.player, glm::vec3(-1*THRUSTER_FORCE_X, 0.0f, 0.0f));
     }
     if (key_state[SDL_SCANCODE_RIGHT])
     {
-        add_acceleration(g_gameState.player, glm::vec3(THRUSTER_FORCE_X, 0.0f, 0.0f));
-        //g_gameState.player->m_animation_indices = g_gameState.player->m_walking[g_gameState.player->RIGHT];
+        if (angle > -90.0f) {
+            g_gameState.player->rotate_clockwise();
+        }
+        //add_acceleration(g_gameState.player, glm::vec3(THRUSTER_FORCE_X, 0.0f, 0.0f));
     }
     if (key_state[SDL_SCANCODE_UP]) {
-        add_acceleration(g_gameState.player, glm::vec3(0.0f, THRUSTER_FORCE_Y, 0.0f));
-        //g_gameState.player->m_animation_indices = g_gameState.player->m_walking[g_gameState.player->UP];
+        glm::vec3 thrustVec = glm::vec3(
+            THRUSTER_FORCE * cos(glm::radians(angle+90)),
+            THRUSTER_FORCE * sin(glm::radians(angle+90)),
+            0.0f);
+        add_acceleration(g_gameState.player, thrustVec);
     }
 
     // normalize forced-movement vector so you don't go faster diagonally
@@ -298,7 +300,8 @@ void update()
         glm::vec3 vel = g_gameState.player->get_velocity();
         float xOffset = g_gameState.player->get_width() / 2;
         float yOffset = g_gameState.player->get_height() / 2;
-
+        float angle = g_gameState.player->get_angle();
+        
         // check for wall collision
         if (abs(pos.x) >= 5.0f - xOffset) {
             vel.x = 0.0f;
@@ -308,8 +311,8 @@ void update()
             vel.y = 0.0f;
             pos.y -= 0.01f;
         }
-            
-        // check for ground collision
+
+        // check for terrain collision
         glm::vec3* collisionPoints = new glm::vec3[3]{
             pos + glm::vec3(0.0f,0.0f-yOffset,0.0f),
             pos + glm::vec3(-0.19f,0.1f-yOffset,0.0f),
@@ -317,16 +320,28 @@ void update()
         };
         for (int i = 0; i < 3; i++) {
             if (collisionPoints[i].y <= get_ground_level(collisionPoints[i].x) + GROUND_OFFSET) {
-                // this should trigger a game-over
-                vel.y = 0.0f;
+                g_gameIsRunning = false;
             }
         }
         delete[] collisionPoints;
 
+        // check for successful landing
+        if (g_gameState.player->m_collided_bottom) {
+            if (angle > 25 or angle < -25 or g_tooFast) {
+                g_gameIsRunning = false;
+            } else {
+                // you win!
+            }
+        }
+
+        // check player speed
+        float currentSpeed = glm::length(vel);
+        g_tooFast = currentSpeed >= SAFE_SPEED;
+
         // move the player
         g_gameState.player->set_position(pos);
         g_gameState.player->set_velocity(vel);
-        g_gameState.player->update(FIXED_TIMESTEP, g_gameState.platforms, 3);
+        g_gameState.player->update(FIXED_TIMESTEP, g_gameState.landingPads, 3);
 
         // update time accumulator
         g_timeAccumulator -= FIXED_TIMESTEP;
@@ -344,8 +359,8 @@ void render()
     // ————— PLAYER ————— //
     g_gameState.player->render(&g_shaderProgram);
 
-    // ————— PLATFORM ————— //
-    for (int i = 0; i < PLATFORM_COUNT; i++) g_gameState.platforms[i].render(&g_shaderProgram);
+    // ————— LANDINGPAD ————— //
+    for (int i = 0; i < LANDINGPAD_COUNT; i++) g_gameState.landingPads[i].render(&g_shaderProgram);
 
     // ————— GENERAL ————— //
     SDL_GL_SwapWindow(g_displayWindow);
@@ -355,7 +370,7 @@ void shutdown() {
     SDL_Quit();
     delete[] g_gameState.background;
     delete[] g_gameState.player;
-    delete[] g_gameState.platforms;
+    delete[] g_gameState.landingPads;
 }
 
 // ————— DRIVER GAME LOOP ————— /
