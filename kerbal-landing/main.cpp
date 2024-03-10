@@ -307,29 +307,33 @@ void process_input()
 
     float angle = g_gameState.player->get_angle();
     const Uint8* key_state = SDL_GetKeyboardState(NULL);
-    if (key_state[SDL_SCANCODE_LEFT])
-    {
-        if (angle < 90.0f) {
-            g_gameState.player->rotate_anticlockwise();
+    if (not g_showEndText) {
+        if (key_state[SDL_SCANCODE_LEFT])
+        {
+            if (angle < 90.0f) {
+                g_gameState.player->rotate_anticlockwise();
+            }
         }
-        //add_acceleration(g_gameState.player, glm::vec3(-1*THRUSTER_FORCE_X, 0.0f, 0.0f));
-    }
-    if (key_state[SDL_SCANCODE_RIGHT])
-    {
-        if (angle > -90.0f) {
-            g_gameState.player->rotate_clockwise();
+        if (key_state[SDL_SCANCODE_RIGHT])
+        {
+            if (angle > -90.0f) {
+                g_gameState.player->rotate_clockwise();
+            }
         }
-        //add_acceleration(g_gameState.player, glm::vec3(THRUSTER_FORCE_X, 0.0f, 0.0f));
+        if (key_state[SDL_SCANCODE_UP] and g_fuel > 0) {
+            g_thrusterOn = true;
+            glm::vec3 thrustVec = glm::vec3(
+                THRUSTER_FORCE * cos(glm::radians(angle + 90)),
+                THRUSTER_FORCE * sin(glm::radians(angle + 90)),
+                0.0f);
+            add_acceleration(g_gameState.player, thrustVec);
+            g_fuel -= 0.1f;
+        }
+        else {
+            g_thrusterOn = false;
+        }
     }
-    if (key_state[SDL_SCANCODE_UP] and g_fuel > 0) {
-        g_thrusterOn = true;
-        glm::vec3 thrustVec = glm::vec3(
-            THRUSTER_FORCE * cos(glm::radians(angle+90)),
-            THRUSTER_FORCE * sin(glm::radians(angle+90)),
-            0.0f);
-        add_acceleration(g_gameState.player, thrustVec);
-        g_fuel -= 0.1f;
-    } else {
+    else {
         g_thrusterOn = false;
     }
 
