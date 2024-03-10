@@ -21,7 +21,6 @@ Entity::Entity()
     m_acceleration = glm::vec3(0.0f);
 
     // ––––– TRANSFORMATION ––––– //
-    m_speed = 0;
     m_angle = 0;
     m_movement = glm::vec3(0.0f);
     m_scale = glm::vec3(1.0f);
@@ -34,6 +33,7 @@ Entity::~Entity()
         delete[] m_walking[i];
     }
     delete[] m_walking;
+    delete[] m_animation_indices;
 }
 
 void Entity::draw_sprite_from_texture_atlas(ShaderProgram* program, GLuint texture_id, int index)

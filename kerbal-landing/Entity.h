@@ -33,7 +33,7 @@ public:
         m_animation_cols = 0,
         m_animation_rows = 0;
 
-    int* m_animation_indices = NULL;
+    int* m_animation_indices = nullptr;
     float m_animation_time = 0.0f;
 
     // ––––– PHYSICS (JUMPING) ––––– //
